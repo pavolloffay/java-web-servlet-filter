@@ -163,7 +163,7 @@ public abstract class AbstractJettyTest {
         }
 
         @Override
-        public void doGet(HttpServletRequest request, HttpServletResponse response)
+        public void doGet(final HttpServletRequest request, HttpServletResponse response)
                 throws ServletException, IOException {
 
             final AsyncContext asyncContext = request.startAsync(request, response);
@@ -179,6 +179,9 @@ public abstract class AbstractJettyTest {
                         try {
                             Thread.sleep(ASYNC_SLEEP_TIME_MS);
                             asyncResponse.setStatus(204);
+                            if (request.getQueryString() != null && request.getQueryString().contains("throwException")) {
+                                throw new RuntimeException();
+                            }
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                             asyncResponse.setStatus(500);

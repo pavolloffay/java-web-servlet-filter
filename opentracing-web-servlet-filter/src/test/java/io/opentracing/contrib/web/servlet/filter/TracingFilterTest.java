@@ -259,6 +259,40 @@ public class TracingFilterTest extends AbstractJettyTest {
     }
 
     @Test
+    public void testAsyncServletException() throws IOException {
+        {
+
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                .url(localRequestUrl("/async?throwException"))
+                .build();
+
+            client.newCall(request).execute();
+            Awaitility.await().until(reportedSpansSize(), IsEqual.equalTo(1));
+        }
+
+        List<MockSpan> mockSpans = mockTracer.finishedSpans();
+        Assert.assertEquals(1, mockSpans.size());
+        assertOnErrors(mockSpans);
+
+        MockSpan mockSpan = mockSpans.get(0);
+        Assert.assertEquals("GET", mockSpan.operationName());
+        Assert.assertEquals(6, mockSpan.tags().size());
+        Assert.assertEquals(Tags.SPAN_KIND_SERVER, mockSpan.tags().get(Tags.SPAN_KIND.getKey()));
+        Assert.assertEquals("GET", mockSpan.tags().get(Tags.HTTP_METHOD.getKey()));
+        Assert.assertEquals(localRequestUrl("/async"), mockSpan.tags().get(Tags.HTTP_URL.getKey()));
+        Assert.assertEquals(500, mockSpan.tags().get(Tags.HTTP_STATUS.getKey()));
+        Assert.assertEquals("java-web-servlet", mockSpan.tags().get(Tags.COMPONENT.getKey()));
+
+        Assert.assertEquals(1, mockSpan.logEntries().size());
+        Assert.assertEquals(3, mockSpan.logEntries().get(0).fields().size());
+        Assert.assertEquals(Tags.ERROR.getKey(), mockSpan.logEntries().get(0).fields().get("event"));
+        Assert.assertEquals(ExceptionServlet.EXCEPTION_MESSAGE,
+            mockSpan.logEntries().get(0).fields().get("message"));
+        Assert.assertNotNull(mockSpan.logEntries().get(0).fields().get("stack"));
+    }
+
+    @Test
     public void testAsyncImmediateExit() throws IOException {
         {
             OkHttpClient client = new OkHttpClient();
