@@ -134,7 +134,7 @@ public class TracingFilter implements Filter {
             throws IOException, ServletException {
 
         HttpServletRequest httpRequest = (HttpServletRequest) servletRequest;
-        HttpServletResponse httpResponse = (HttpServletResponse) servletResponse;
+        final HttpServletResponse httpResponse = (HttpServletResponse) servletResponse;
 
         if (!isTraced(httpRequest, httpResponse)) {
             chain.doFilter(httpRequest, httpResponse);
@@ -181,6 +181,7 @@ public class TracingFilter implements Filter {
                             .addListener(new AsyncListener() {
                         @Override
                         public void onComplete(AsyncEvent event) throws IOException {
+                            System.out.println("\n\nOn complete\n\n");
                             try (Scope asyncScope = tracer.scopeManager().activate(scope.span(), true)) {
                                 for (ServletFilterSpanDecorator spanDecorator: spanDecorators) {
                                     spanDecorator.onResponse((HttpServletRequest) event.getSuppliedRequest(),
@@ -191,14 +192,46 @@ public class TracingFilter implements Filter {
 
                         @Override
                         public void onTimeout(AsyncEvent event) throws IOException {
+                            System.out.println("\n\nOn timeout\n\n");
                         }
 
                         @Override
                         public void onError(AsyncEvent event) throws IOException {
+                            System.out.println("\n\nOn error\n\n");
+                            HttpServletRequest httpRequest = (HttpServletRequest) event.getSuppliedRequest();
+                            HttpServletResponse httpResponse = (HttpServletResponse) event.getSuppliedResponse();
+                            for (ServletFilterSpanDecorator spanDecorator: spanDecorators) {
+                                spanDecorator.onError(httpRequest,
+                                    httpResponse,
+                                    event.getThrowable(),
+                                    scope.span());
+                            }
                         }
 
                         @Override
                         public void onStartAsync(AsyncEvent event) throws IOException {
+                            System.out.println("\n\nOn async started\n\n");
+//                            event.getAsyncContext().addListener(new AsyncListener() {
+//                                @Override
+//                                public void onComplete(AsyncEvent event) throws IOException {
+//                                    System.out.println("\n\n\n\ncomp\n\n\n");
+//                                }
+//
+//                                @Override
+//                                public void onTimeout(AsyncEvent event) throws IOException {
+//
+//                                }
+//
+//                                @Override
+//                                public void onError(AsyncEvent event) throws IOException {
+//                                    System.out.println("\n\n\n\nerrr\n\n\n");
+//                                }
+//
+//                                @Override
+//                                public void onStartAsync(AsyncEvent event) throws IOException {
+//
+//                                }
+//                            });
                         }
                     });
                 } else {

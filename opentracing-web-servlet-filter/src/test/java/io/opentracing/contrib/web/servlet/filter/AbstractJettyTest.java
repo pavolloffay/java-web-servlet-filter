@@ -62,7 +62,9 @@ public abstract class AbstractJettyTest {
 
         servletContext.addServlet(new ServletHolder(new LocalSpanServlet(mockTracer)), "/localSpan");
         servletContext.addServlet(new ServletHolder(new CurrentSpanServlet(mockTracer)), "/currentSpan");
-        servletContext.addServlet(ExceptionServlet.class, "/servletException");
+        ServletHolder servletHolder = servletContext
+            .addServlet(ExceptionServlet.class, "/servletException");
+        servletHolder.setAsyncSupported(true);
 
         servletContext.addFilter(new FilterHolder(tracingFilter()), "/*", EnumSet.of(DispatcherType.REQUEST,
                 DispatcherType.FORWARD, DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.INCLUDE));
@@ -139,9 +141,26 @@ public abstract class AbstractJettyTest {
         public static final String EXCEPTION_MESSAGE = ExceptionServlet.class.getName() + "message";
 
         @Override
-        public void doGet(HttpServletRequest request, HttpServletResponse response)
+        public void doGet(final HttpServletRequest request, HttpServletResponse response)
                 throws ServletException, IOException {
-            throw new ServletException(EXCEPTION_MESSAGE);
+//            final AsyncContext asyncContext = request.startAsync();
+//            asyncContext.start(new Runnable() {
+//                @Override
+//                public void run() {
+//                    asyncContext.complete();
+//                }
+//            });
+//            if (request.isAsyncStarted()) {
+//                request.getAsyncContext().complete();
+//            }
+//            try {
+                throw new ServletException(EXCEPTION_MESSAGE);
+//            } finally {
+//                if (request.isAsyncStarted()) {
+//                    request.getAsyncContext().complete();
+//                }
+//            }
+
         }
     }
 
@@ -156,31 +175,58 @@ public abstract class AbstractJettyTest {
         }
 
         @Override
-        public void doGet(HttpServletRequest request, HttpServletResponse response)
+        public void doGet(final HttpServletRequest request, HttpServletResponse response)
                 throws ServletException, IOException {
-
-            final AsyncContext asyncContext = request.startAsync(request, response);
 
             // TODO: This could be avoided by using an OpenTracing aware Runnable (when available)
             final Span cont = tracer.activeSpan();
 
-            asyncContext.start(new Runnable() {
-                @Override
-                public void run() {
-                    HttpServletResponse asyncResponse = (HttpServletResponse) asyncContext.getResponse();
-                    try (Scope activeScope = tracer.scopeManager().activate(cont, false)) {
-                        try {
-                            Thread.sleep(ASYNC_SLEEP_TIME_MS);
-                            asyncResponse.setStatus(204);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                            asyncResponse.setStatus(500);
-                        } finally {
-                            asyncContext.complete();
-                        }
-                    }
-                }
-            });
+//            asyncContext.start(new Runnable() {
+//                @Override
+//                public void run() {
+//                    HttpServletResponse asyncResponse = (HttpServletResponse) asyncContext.getResponse();
+//                    try (Scope activeScope = tracer.scopeManager().activate(cont, false)) {
+//                        try {
+//                            Thread.sleep(ASYNC_SLEEP_TIME_MS);
+//                            asyncResponse.setStatus(204);
+//                            if (request.getQueryString() != null && request.getQueryString().contains("throwException")) {
+////                                asyncContext.dispatch("/servletException?throwAsyncException");
+////                                throw new RuntimeException();
+//                            }
+////                            if (request.getQueryString() != null && request.getQueryString().contains("throwNow")) {
+////                                throw new RuntimeException();
+////                            }
+//                        } catch (InterruptedException e) {
+//                            e.printStackTrace();
+//                            asyncResponse.setStatus(500);
+//                        } finally {
+//                            asyncContext.complete();
+//                        }
+//                    }
+//                }
+//            });
+//            try {
+//                Thread.sleep(200);
+            request.getRequestDispatcher("/servletException").forward(request, response);
+//            final AsyncContext asyncContext = request.startAsync();
+//            asyncContext.start(new Runnable() {
+//                @Override
+//                public void run() {
+//                    try {
+////                        request.getRequestDispatcher("/servletException").forward(request, response);
+//                        asyncContext.dispatch("/servletException");
+//                    } finally {
+////                        asyncContext.complete();
+//                    }
+//                }
+//            });
+//                throw new RuntimeException();
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            } finally {
+//                final AsyncContext asyncContext = request.startAsync(request, response);
+//                asyncContext.complete();
+//            }
         }
     }
 
